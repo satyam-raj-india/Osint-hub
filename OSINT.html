@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OSINT</title>
+
+<style>
+body{
+  font-family: Arial, sans-serif;
+  background:#f2f2f2;
+  margin:0;
+  padding:20px;
+}
+.main{max-width:700px;margin:auto;}
+.box{
+  background:#fff;
+  padding:15px;
+  margin-bottom:20px;
+  border-radius:8px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.1);
+}
+button,input{
+  width:100%;
+  padding:10px;
+  margin-top:8px;
+}
+button{
+  background:#1976d2;
+  color:#fff;
+  border:none;
+  cursor:pointer;
+}
+button:disabled{background:#999;}
+pre{
+  background:#eee;
+  padding:10px;
+  overflow:auto;
+}
+.api-box{
+  background:#111;
+  color:#0f0;
+  padding:10px;
+  border-radius:6px;
+  margin-top:10px;
+  word-break:break-all;
+}
+.userbar{
+  background:#fff;
+  padding:10px;
+  margin-bottom:20px;
+  border-radius:6px;
+  display:flex;
+  justify-content:space-between;
+}
+</style>
+</head>
+
+<body>
+<div class="main">
+
+<div class="userbar">
+  <strong id="username">User</strong>
+  <span>💰 Coins: <b id="credits">0</b></span>
+</div>
+<button onclick="window.location.href='buy.html'">Buy Credits</button>
+<h3>OSINT</h3>
+<h5>Credit Based Intelligence Tool</h5>
+
+<!-- NUMBER SEARCH -->
+<div class="box">
+<h4>📞 Number Lookup</h4>
+<input id="num" placeholder="7872804557">
+<button onclick="runNumber()">Fetch (2 Coins)</button>
+<pre id="numResult"></pre>
+</div>
+
+<!-- IFSC PURCHASE -->
+<div class="box">
+<h4>🏦 Buy IFSC API</h4>
+<p>Price: <b>200 Coins</b></p>
+<button onclick="buyIFSC()">Buy IFSC API</button>
+<div id="ifscBox" class="api-box" style="display:none;">
+  <div id="ifscApi"></div>
+  <button onclick="copyText('ifscApi')">📋 Copy API</button>
+</div>
+</div>
+
+<!-- PINCODE PURCHASE -->
+<div class="box">
+<h4>📍 Buy Pincode AI API</h4>
+<p>Price: <b>100 Coins</b></p>
+<button onclick="buyPin()">Buy Pincode AI</button>
+<div id="pinBox" class="api-box" style="display:none;">
+  <div id="pinApi"></div>
+  <button onclick="copyText('pinApi')">📋 Copy API</button>
+</div>
+</div>
+
+<!-- VEHICLE PURCHASE -->
+<div class="box">
+<h4>🚗 Buy Vehicle Info API (Full Data)</h4>
+<p>Price: <b>400 Coins</b></p>
+<button onclick="buyVehicle()">Buy Vehicle API</button>
+<div id="vehicleBox" class="api-box" style="display:none;">
+  <div id="vehicleApi"></div>
+  <button onclick="copyText('vehicleApi')">📋 Copy API</button>
+</div>
+</div>
+
+</div>
+
+<script>
+/* ===== CONFIG ===== */
+const BIN_ID = "69632397d0ea881f40634e5c";
+const MASTER_KEY = "$2a$10$5TyPwxtO8pS6G5qBROpTx.PX3NTZx3bg/W6cnelH2J5Qzyfz27ZA.";
+const DB_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+const TIMEOUT = 6000;
+
+/* ===== AUTH ===== */
+let user = JSON.parse(sessionStorage.getItem("osint_user"));
+if(!user) location.href="index.html";
+
+username.textContent = user.Username;
+credits.textContent = user.Credits;
+
+/* ===== CREDIT DEDUCT ===== */
+async function deduct(cost){
+  if(user.Credits < cost){
+    alert("Not enough Coins");
+    return false;
+  }
+
+  const r = await fetch(`${DB_URL}/latest`,{
+    headers:{ "X-Master-Key":MASTER_KEY, "X-Bin-Meta":"false" }
+  });
+  const d = await r.json();
+  const users = d.Users || [];
+  const u = users.find(x=>x.Username===user.Username);
+  if(!u || u.Credits < cost) return false;
+
+  u.Credits -= cost;
+
+  await fetch(DB_URL,{
+    method:"PUT",
+    headers:{ "Content-Type":"application/json","X-Master-Key":MASTER_KEY },
+    body:JSON.stringify({Users:users})
+  });
+
+  user.Credits = u.Credits;
+  sessionStorage.setItem("osint_user",JSON.stringify(user));
+  credits.textContent = user.Credits;
+  return true;
+}
+
+/* ===== NUMBER SEARCH (2 COINS) ===== */
+async function runNumber(){
+  const ok = await deduct(2);
+  if(!ok) return;
+
+  let v = num.value.trim();
+  if(!v) return numResult.textContent="Enter number";
+  numResult.textContent="Loading...";
+
+  fetch("https://source-code-api.vercel.app/?num="+v)
+    .then(r=>r.json())
+    .then(d=>numResult.textContent=JSON.stringify(d,null,2))
+    .catch(()=>numResult.textContent="Failed");
+}
+
+/* ===== PURCHASE FUNCTIONS ===== */
+async function buyIFSC(){
+  if(user.IFSC_API){
+    showIFSC();
+    return;
+  }
+  const ok = await deduct(200);
+  if(!ok) return;
+  user.IFSC_API = true;
+  sessionStorage.setItem("osint_user",JSON.stringify(user));
+  showIFSC();
+}
+
+function showIFSC(){
+  ifscBox.style.display="block";
+  ifscApi.textContent="https://ab-ifscinfoapi.vercel.app/info?ifsc=YOUR_IFSC";
+}
+
+async function buyPin(){
+  if(user.PIN_API){
+    showPin();
+    return;
+  }
+  const ok = await deduct(100);
+  if(!ok) return;
+  user.PIN_API = true;
+  sessionStorage.setItem("osint_user",JSON.stringify(user));
+  showPin();
+}
+
+function showPin(){
+  pinBox.style.display="block";
+  pinApi.textContent="https://pin-code-2-village.vercel.app/?pin=PINCODE";
+}
+
+async function buyVehicle(){
+  if(user.VEHICLE_API){
+    showVehicle();
+    return;
+  }
+  const ok = await deduct(400);
+  if(!ok) return;
+  user.VEHICLE_API = true;
+  sessionStorage.setItem("osint_user",JSON.stringify(user));
+  showVehicle();
+}
+
+function showVehicle(){
+  vehicleBox.style.display="block";
+  vehicleApi.textContent="https://reseller-host.vercel.app/api/rc?number=VEHICLE_NO";
+}
+
+/* ===== COPY ===== */
+function copyText(id){
+  navigator.clipboard.writeText(document.getElementById(id).textContent);
+  alert("API copied");
+}
+</script>
+</body>
+</html>

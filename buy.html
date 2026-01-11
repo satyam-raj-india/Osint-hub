@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Buy Credits</title>
+
+<style>
+body{
+  font-family:Arial, sans-serif;
+  background:#f2f2f2;
+  margin:0;
+  padding:20px;
+}
+.main{
+  max-width:600px;
+  margin:auto;
+}
+.box{
+  background:#fff;
+  padding:15px;
+  margin-bottom:20px;
+  border-radius:8px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.1);
+}
+button,input{
+  width:100%;
+  padding:10px;
+  margin-top:8px;
+}
+button{
+  background:#1976d2;
+  color:#fff;
+  border:none;
+  cursor:pointer;
+}
+button:disabled{background:#999;}
+.notice{
+  background:#e3f2fd;
+  padding:10px;
+  border-radius:6px;
+  font-size:13px;
+}
+.userbar{
+  background:#fff;
+  padding:10px;
+  margin-bottom:20px;
+  border-radius:6px;
+  display:flex;
+  justify-content:space-between;
+}
+</style>
+</head>
+
+<body>
+<div class="main">
+
+<div class="userbar">
+  <strong id="username">Guest</strong>
+  <span>💰 Coins: <b id="credits">0</b></span>
+</div>
+
+<h3>💰 Buy Credits</h3>
+
+<div class="box">
+<h4>💳 UPI Payment</h4>
+<p><b>UPI ID:</b> <code>gourtkd@axl</code></p>
+</div>
+
+<div class="box">
+<h4>🪙 Credit Plans (Instant Redirect)</h4>
+
+<button onclick="selectPlan(2)">2 Credits – ₹5</button>
+<button onclick="selectPlan(10)">10 Credits – ₹25</button>
+<button onclick="selectPlan(20)">20 Credits – ₹50</button>
+<button onclick="selectPlan(50)">50 Credits – ₹125</button>
+
+<label>Custom Credits (even number)</label>
+<input id="customCredits" type="number" placeholder="Enter credits">
+<button onclick="customPlan()">Use Custom Plan</button>
+</div>
+
+<div class="box">
+<h4>✅ Verify Payment</h4>
+
+<label>Username</label>
+<input id="usernameConfirm" placeholder="Enter your username">
+
+<label>Amount Paid (₹)</label>
+<input id="amountPaid" type="number">
+
+<label>Credits You Will Receive</label>
+<input id="creditsReceive" readonly>
+
+<label>Upload Payment Screenshot</label>
+<input id="screenshot" type="file" accept="image/*">
+
+<button id="verifyBtn" onclick="submitVerification()">Verify Payment</button>
+
+<div class="notice" style="margin-top:10px;">
+⏱️ It will be done under <b>45 seconds</b>.<br>
+You will receive credits <b>automatically</b>.
+</div>
+</div>
+
+</div>
+
+<script>
+/* ===== CONFIG ===== */
+const UPI_ID = "gourtkd@axl";
+const DISCORD_WEBHOOK =
+"https://discord.com/api/webhooks/1455551929299243246/d6kzw5vyX0KVCkCKrNqP3w1SrYYc6UYn_GDiE8dYtzkS4l9oHH0rFSi0VHIj9jlds6bG";
+
+/* ===== LOAD USER (LOCAL STORAGE) ===== */
+let user;
+try{
+  user = JSON.parse(localStorage.getItem("osint_user"));
+}catch(e){
+  user = null;
+}
+
+if(user && user.Username){
+  username.textContent = user.Username;
+  credits.textContent = user.Credits ?? 0;
+  usernameConfirm.value = user.Username;
+}
+
+/* ===== UPI REDIRECT ===== */
+function openUPI(amount){
+  if(!amount || amount <= 0){
+    alert("Invalid amount");
+    return;
+  }
+  const note = encodeURIComponent("OSINT Credits Purchase");
+  const upiURL =
+`upi://pay?pa=${UPI_ID}&pn=OSINT&am=${amount}&cu=INR&tn=${note}`;
+  location.href = upiURL;
+}
+
+/* ===== PLAN LOGIC ===== */
+function selectPlan(credits){
+  const amount = (credits / 2) * 5;
+  creditsReceive.value = credits;
+  amountPaid.value = amount;
+  openUPI(amount);
+}
+
+function customPlan(){
+  const c = Number(customCredits.value);
+  if(!c || c % 2 !== 0){
+    alert("Enter a valid even credit amount");
+    return;
+  }
+  const amount = (c / 2) * 5;
+  creditsReceive.value = c;
+  amountPaid.value = amount;
+  openUPI(amount);
+}
+
+/* ===== SUBMIT VERIFICATION ===== */
+async function submitVerification(){
+  verifyBtn.disabled = true;
+
+  if(!usernameConfirm.value || !amountPaid.value || !creditsReceive.value){
+    alert("Fill all fields");
+    verifyBtn.disabled = false;
+    return;
+  }
+
+  const file = screenshot.files[0];
+  if(!file){
+    alert("Screenshot required");
+    verifyBtn.disabled = false;
+    return;
+  }
+
+  const form = new FormData();
+  form.append("content",
+`💰 **CREDIT PURCHASE**
+
+👤 Username: ${usernameConfirm.value}
+🪙 Credits: ${creditsReceive.value}
+₹ Paid: ${amountPaid.value}
+💳 UPI: ${UPI_ID}
+⏱️ Status: Pending`);
+
+  form.append("file", file);
+
+  try{
+    await fetch(DISCORD_WEBHOOK,{
+      method:"POST",
+      body:form
+    });
+    alert("Payment submitted successfully");
+  }catch(e){
+    alert("Failed to submit. Try again.");
+  }
+
+  verifyBtn.disabled = false;
+}
+</script>
+</body>
+</html>
