@@ -2,107 +2,97 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Buy Credits</title>
 
 <style>
 body{
-  font-family:Arial, sans-serif;
-  background:#f2f2f2;
-  margin:0;
+  font-family: Arial, sans-serif;
+  background:#fff;
+  color:#000;
+  max-width:480px;
+  margin:40px auto;
   padding:20px;
+  border:2px solid #000;
+  border-radius:10px;
 }
-.main{
-  max-width:600px;
-  margin:auto;
+h1{
+  text-align:center;
+  color:orange;
+  margin-bottom:20px;
 }
 .box{
-  background:#fff;
-  padding:15px;
   margin-bottom:20px;
-  border-radius:8px;
-  box-shadow:0 2px 6px rgba(0,0,0,0.1);
 }
-button,input{
+label{
+  font-weight:bold;
+  display:block;
+  margin:12px 0 5px;
+}
+input{
   width:100%;
   padding:10px;
-  margin-top:8px;
+  border:1px solid #ccc;
+  border-radius:6px;
 }
 button{
-  background:#1976d2;
+  width:100%;
+  padding:12px;
+  margin-top:10px;
+  background:orange;
   color:#fff;
+  font-weight:bold;
   border:none;
+  border-radius:8px;
   cursor:pointer;
+  box-shadow:0 0 6px orange,0 0 12px orange;
 }
-button:disabled{background:#999;}
-.notice{
-  background:#e3f2fd;
-  padding:10px;
-  border-radius:6px;
-  font-size:13px;
-}
-.userbar{
-  background:#fff;
-  padding:10px;
-  margin-bottom:20px;
-  border-radius:6px;
-  display:flex;
-  justify-content:space-between;
+button:hover{background:darkorange;}
+.note{
+  font-size:0.95em;
+  color:#444;
+  margin-top:15px;
 }
 </style>
 </head>
 
 <body>
-<div class="main">
 
-<div class="userbar">
-  <strong id="username">Guest</strong>
-  <span>💰 Coins: <b id="credits">0</b></span>
-</div>
-
-<h3>💰 Buy Credits</h3>
+<h1>Buy Credits</h1>
 
 <div class="box">
-<h4>💳 UPI Payment</h4>
-<p><b>UPI ID:</b> <code>gourtkd@axl</code></p>
+<h3>🔥 Quick Buy (Instant UPI)</h3>
+
+<button onclick="quickBuy(48)">Buy 48 Coins</button>
+<button onclick="quickBuy(50)">Buy 50 Coins</button>
+<button onclick="quickBuy(102)">Buy 102 Coins</button>
+<button onclick="quickBuy(200)">Buy 200 Coins</button>
 </div>
 
-<div class="box">
-<h4>🪙 Credit Plans (Instant Redirect)</h4>
-
-<button onclick="selectPlan(2)">2 Credits – ₹5</button>
-<button onclick="selectPlan(10)">10 Credits – ₹25</button>
-<button onclick="selectPlan(20)">20 Credits – ₹50</button>
-<button onclick="selectPlan(50)">50 Credits – ₹125</button>
-
-<label>Custom Credits (even number)</label>
-<input id="customCredits" type="number" placeholder="Enter credits">
-<button onclick="customPlan()">Use Custom Plan</button>
-</div>
+<hr>
 
 <div class="box">
-<h4>✅ Verify Payment</h4>
+<h3>🪙 Custom Credits</h3>
 
 <label>Username</label>
-<input id="usernameConfirm" placeholder="Enter your username">
+<input id="usernameInput" placeholder="Exact username">
 
-<label>Amount Paid (₹)</label>
-<input id="amountPaid" type="number">
+<label>Credits you want</label>
+<input id="creditsInput" type="number" placeholder="Even number">
 
-<label>Credits You Will Receive</label>
-<input id="creditsReceive" readonly>
+<button onclick="calculate()">Calculate Payment</button>
+</div>
+
+<div class="box" id="paymentBox" style="display:none;"></div>
 
 <label>Upload Payment Screenshot</label>
-<input id="screenshot" type="file" accept="image/*">
+<input id="proof" type="file" accept="image/*">
 
-<button id="verifyBtn" onclick="submitVerification()">Verify Payment</button>
+<button onclick="sendProof()">Send Payment Proof</button>
 
-<div class="notice" style="margin-top:10px;">
-⏱️ It will be done under <b>45 seconds</b>.<br>
-You will receive credits <b>automatically</b>.
-</div>
-</div>
-
-</div>
+<p class="note">
+⚠️ Credits will be added within <b>45 seconds</b> after verification.
+</p>
 
 <script>
 /* ===== CONFIG ===== */
@@ -110,93 +100,90 @@ const UPI_ID = "gourtkd@axl";
 const DISCORD_WEBHOOK =
 "https://discord.com/api/webhooks/1455551929299243246/d6kzw5vyX0KVCkCKrNqP3w1SrYYc6UYn_GDiE8dYtzkS4l9oHH0rFSi0VHIj9jlds6bG";
 
-/* ===== LOAD USER (LOCAL STORAGE) ===== */
-let user;
+/* ===== AUTO USERNAME ===== */
 try{
-  user = JSON.parse(localStorage.getItem("osint_user"));
-}catch(e){
-  user = null;
-}
-
-if(user && user.Username){
-  username.textContent = user.Username;
-  credits.textContent = user.Credits ?? 0;
-  usernameConfirm.value = user.Username;
-}
-
-/* ===== UPI REDIRECT ===== */
-function openUPI(amount){
-  if(!amount || amount <= 0){
-    alert("Invalid amount");
-    return;
+  const user = JSON.parse(localStorage.getItem("osint_user"));
+  if(user && user.Username){
+    document.getElementById("usernameInput").value = user.Username;
   }
-  const note = encodeURIComponent("OSINT Credits Purchase");
+}catch(e){}
+
+/* ===== QUICK BUY (SILENT CALC + REDIRECT) ===== */
+function quickBuy(coins){
+  if(!coins || coins <= 0) return;
+
+  const amount = (coins / 2) * 5; // silent calculation
+  const note = encodeURIComponent(`OSINT Credits ${coins}`);
+
   const upiURL =
 `upi://pay?pa=${UPI_ID}&pn=OSINT&am=${amount}&cu=INR&tn=${note}`;
-  location.href = upiURL;
+
+  window.location.href = upiURL;
 }
 
-/* ===== PLAN LOGIC ===== */
-function selectPlan(credits){
-  const amount = (credits / 2) * 5;
-  creditsReceive.value = credits;
-  amountPaid.value = amount;
-  openUPI(amount);
-}
+/* ===== CUSTOM CALC ===== */
+function calculate(){
+  const username = usernameInput.value.trim();
+  const credits = Number(creditsInput.value);
 
-function customPlan(){
-  const c = Number(customCredits.value);
-  if(!c || c % 2 !== 0){
+  if(!username){
+    alert("Enter exact username");
+    return;
+  }
+  if(!credits || credits <= 0 || credits % 2 !== 0){
     alert("Enter a valid even credit amount");
     return;
   }
-  const amount = (c / 2) * 5;
-  creditsReceive.value = c;
-  amountPaid.value = amount;
-  openUPI(amount);
+
+  const amount = (credits / 2) * 5;
+
+  paymentBox.style.display = "block";
+  paymentBox.innerHTML = `
+<b>Username:</b> ${username}<br>
+<b>Credits:</b> ${credits}<br>
+<b>Amount:</b> ₹${amount}<br><br>
+<b>UPI:</b> gourtkd@axl
+`;
 }
 
-/* ===== SUBMIT VERIFICATION ===== */
-async function submitVerification(){
-  verifyBtn.disabled = true;
+/* ===== SEND PROOF ===== */
+async function sendProof(){
+  const username = usernameInput.value.trim();
+  const credits = creditsInput.value;
+  const file = proof.files[0];
 
-  if(!usernameConfirm.value || !amountPaid.value || !creditsReceive.value){
-    alert("Fill all fields");
-    verifyBtn.disabled = false;
+  if(!username || !credits){
+    alert("Fill details first");
     return;
   }
-
-  const file = screenshot.files[0];
   if(!file){
-    alert("Screenshot required");
-    verifyBtn.disabled = false;
+    alert("Upload payment screenshot");
     return;
   }
+
+  const amount = (credits / 2) * 5;
 
   const form = new FormData();
-  form.append("content",
-`💰 **CREDIT PURCHASE**
-
-👤 Username: ${usernameConfirm.value}
-🪙 Credits: ${creditsReceive.value}
-₹ Paid: ${amountPaid.value}
-💳 UPI: ${UPI_ID}
-⏱️ Status: Pending`);
-
   form.append("file", file);
+  form.append("content",
+`💰 CREDIT PURCHASE
+
+Username: ${username}
+Credits: ${credits}
+Amount: ₹${amount}
+UPI: gourtkd@axl`);
 
   try{
     await fetch(DISCORD_WEBHOOK,{
       method:"POST",
       body:form
     });
-    alert("Payment submitted successfully");
-  }catch(e){
-    alert("Failed to submit. Try again.");
+    alert("✅ Proof sent. Credits will be added shortly.");
+  }catch{
+    alert("❌ Failed to send proof.");
   }
-
-  verifyBtn.disabled = false;
 }
 </script>
+
 </body>
 </html>
