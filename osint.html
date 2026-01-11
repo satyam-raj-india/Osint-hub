@@ -2,8 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>OSINT</title>
-
+<title>OSINT Intelligence Tool</title>
 <style>
 body{
   font-family: Arial, sans-serif;
@@ -29,12 +28,16 @@ button{
   color:#fff;
   border:none;
   cursor:pointer;
+  border-radius:4px;
 }
 button:disabled{background:#999;}
+button:hover:not(:disabled){background:#1565c0;}
 pre{
   background:#eee;
   padding:10px;
   overflow:auto;
+  border-radius:4px;
+  max-height:400px;
 }
 .api-box{
   background:#111;
@@ -51,26 +54,37 @@ pre{
   border-radius:6px;
   display:flex;
   justify-content:space-between;
+  box-shadow:0 2px 6px rgba(0,0,0,0.1);
 }
+.status{
+  padding:8px;
+  margin-top:8px;
+  border-radius:4px;
+  font-size:12px;
+}
+.status.success{background:#d4edda;color:#155724;}
+.status.error{background:#f8d7da;color:#721c24;}
+.status.info{background:#d1ecf1;color:#0c5460;}
 </style>
 </head>
-
 <body>
 <div class="main">
-
 <div class="userbar">
   <strong id="username">User</strong>
   <span>💰 Coins: <b id="credits">0</b></span>
 </div>
+
 <button onclick="window.location.href='buy.html'">Buy Credits</button>
-<h3>OSINT</h3>
-<h5>Credit Based Intelligence Tool</h5>
+
+<h3>🔍 OSINT Intelligence Tool</h3>
+<h5>Credit Based Intelligence with Multi-Proxy Support</h5>
 
 <!-- NUMBER SEARCH -->
 <div class="box">
 <h4>📞 Number Lookup</h4>
-<input id="num" placeholder="7872804557">
+<input id="num" placeholder="7872804557" type="tel">
 <button onclick="runNumber()">Fetch (2 Coins)</button>
+<div id="numStatus"></div>
 <pre id="numResult"></pre>
 </div>
 
@@ -107,6 +121,15 @@ pre{
 </div>
 </div>
 
+<!-- API TEST SECTION -->
+<div class="box">
+<h4>🧪 Test API with Proxy</h4>
+<input id="testUrl" placeholder="Enter API URL to test">
+<button onclick="testAPI()">Test API</button>
+<div id="testStatus"></div>
+<pre id="testResult"></pre>
+</div>
+
 </div>
 
 <script>
@@ -114,57 +137,157 @@ pre{
 const BIN_ID = "69632397d0ea881f40634e5c";
 const MASTER_KEY = "$2a$10$5TyPwxtO8pS6G5qBROpTx.PX3NTZx3bg/W6cnelH2J5Qzyfz27ZA.";
 const DB_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
-const TIMEOUT = 6000;
+const TIMEOUT = 8000;
+
+/* ===== CORS PROXY LIST ===== */
+const CORS_PROXIES = [
+  'https://api.allorigins.win/raw?url=',
+  'https://corsproxy.io/?',
+  'https://api.codetabs.com/v1/proxy?quest=',
+  'https://cors-anywhere.herokuapp.com/',
+  'https://thingproxy.freeboard.io/fetch/'
+];
 
 /* ===== AUTH ===== */
 let user = JSON.parse(sessionStorage.getItem("osint_user"));
-if(!user) location.href="index.html";
+if(!user) {
+  location.href = "index.html";
+}
 
 username.textContent = user.Username;
 credits.textContent = user.Credits;
 
+/* ===== MULTI-PROXY FETCH FUNCTION ===== */
+async function fetchWithProxies(url, options = {}) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
+  
+  // Try direct fetch first
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (e) {
+    console.log('Direct fetch failed, trying proxies...');
+  }
+  
+  // Try each proxy
+  for (let proxy of CORS_PROXIES) {
+    try {
+      const controller2 = new AbortController();
+      const timeoutId2 = setTimeout(() => controller2.abort(), TIMEOUT);
+      
+      const proxiedUrl = proxy + encodeURIComponent(url);
+      console.log(`Trying proxy: `);
+      
+      const response = await fetch(proxiedUrl, {
+        signal: controller2.signal
+      });
+      
+      clearTimeout(timeoutId2);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`Success with proxy: ${proxy}`);
+        return data;
+      }
+    } catch (e) {
+      console.log(`Proxy failed: ${proxy}`, e.message);
+      continue;
+    }
+  }
+  
+  throw new Error('All proxies failed');
+}
+
+/* ===== STATUS DISPLAY ===== */
+function showStatus(elementId, message, type = 'info') {
+  const el = document.getElementById(elementId);
+  el.innerHTML = `<div class="status ${type}">${message}</div>`;
+}
+
 /* ===== CREDIT DEDUCT ===== */
 async function deduct(cost){
   if(user.Credits < cost){
-    alert("Not enough Coins");
+    alert("❌ Not enough Coins");
     return false;
   }
-
-  const r = await fetch(`${DB_URL}/latest`,{
-    headers:{ "X-Master-Key":MASTER_KEY, "X-Bin-Meta":"false" }
-  });
-  const d = await r.json();
-  const users = d.Users || [];
-  const u = users.find(x=>x.Username===user.Username);
-  if(!u || u.Credits < cost) return false;
-
-  u.Credits -= cost;
-
-  await fetch(DB_URL,{
-    method:"PUT",
-    headers:{ "Content-Type":"application/json","X-Master-Key":MASTER_KEY },
-    body:JSON.stringify({Users:users})
-  });
-
-  user.Credits = u.Credits;
-  sessionStorage.setItem("osint_user",JSON.stringify(user));
-  credits.textContent = user.Credits;
-  return true;
+  
+  try {
+    const r = await fetch(`${DB_URL}/latest`,{
+      headers:{ "X-Master-Key":MASTER_KEY, "X-Bin-Meta":"false" }
+    });
+    const d = await r.json();
+    const users = d.Users || [];
+    const u = users.find(x=>x.Username===user.Username);
+    
+    if(!u || u.Credits < cost) {
+      alert("❌ Insufficient credits or user not found");
+      return false;
+    }
+    
+    u.Credits -= cost;
+    
+    await fetch(DB_URL,{
+      method:"PUT",
+      headers:{ "Content-Type":"application/json","X-Master-Key":MASTER_KEY },
+      body:JSON.stringify({Users:users})
+    });
+    
+    user.Credits = u.Credits;
+    sessionStorage.setItem("osint_user",JSON.stringify(user));
+    credits.textContent = user.Credits;
+    return true;
+  } catch(e) {
+    alert("❌ Error updating credits: " + e.message);
+    return false;
+  }
 }
 
 /* ===== NUMBER SEARCH (2 COINS) ===== */
 async function runNumber(){
   const ok = await deduct(2);
   if(!ok) return;
-
+  
   let v = num.value.trim();
-  if(!v) return numResult.textContent="Enter number";
-  numResult.textContent="Loading...";
-
-  fetch("https://akash-number-info-api.vercel.app/api/number?num=+v)
-    .then(r=>r.json())
-    .then(d=>numResult.textContent=JSON.stringify(d,null,2))
-    .catch(()=>numResult.textContent="Failed");
+  if(!v) {
+    showStatus('numStatus', 'Please enter a number', 'error');
+    return;
+  }
+  
+  numResult.textContent = "";
+  showStatus('numStatus', '🔄 Searching through multiple sources...', 'info');
+  
+  const apis = [
+    `https://source-code-api.vercel.app/?num=${v}`,
+    `https://akash-number-info-api.vercel.app/api/number?num=${v}`
+  ];
+  
+  let success = false;
+  
+  for (let api of apis) {
+    try {
+      showStatus('numStatus', `🔄 Trying API: ${api.split('/')[2]}...`, 'info');
+      const data = await fetchWithProxies(api);
+      numResult.textContent = JSON.stringify(data, null, 2);
+      showStatus('numStatus', '✅ Data retrieved successfully!', 'success');
+      success = true;
+      break;
+    } catch(e) {
+      console.log(`API failed: ${api}`, e);
+      continue;
+    }
+  }
+  
+  if (!success) {
+    showStatus('numStatus', '❌ All APIs failed. Please try again later.', 'error');
+    numResult.textContent = "No data available";
+  }
 }
 
 /* ===== PURCHASE FUNCTIONS ===== */
@@ -219,12 +342,41 @@ function showVehicle(){
   vehicleApi.textContent="https://reseller-host.vercel.app/api/rc?number=VEHICLE_NO";
 }
 
-/* ===== COPY ===== */
-function copyText(id){
-  navigator.clipboard.writeText(document.getElementById(id).textContent);
-  alert("API copied");
+/* ===== TEST API FUNCTION ===== */
+async function testAPI() {
+  const url = testUrl.value.trim();
+  if (!url) {
+    showStatus('testStatus', 'Please enter a URL', 'error');
+    return;
+  }
+  
+  testResult.textContent = "";
+  showStatus('testStatus', '🔄 Testing API with multiple proxies...', 'info');
+  
+  try {
+    const data = await fetchWithProxies(url);
+    testResult.textContent = JSON.stringify(data, null, 2);
+    showStatus('testStatus', '✅ API test successful!', 'success');
+  } catch(e) {
+    showStatus('testStatus', `❌ All attempts failed: ${e.message}`, 'error');
+    testResult.textContent = `Error: ${e.message}`;
+  }
 }
+
+/* ===== COPY FUNCTION ===== */
+function copyText(id){
+  const text = document.getElementById(id).textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    alert("✅ API copied to clipboard!");
+  }).catch(() => {
+    alert("❌ Failed to copy");
+  });
+}
+
+// Show purchased APIs on load
+if(user.IFSC_API) showIFSC();
+if(user.PIN_API) showPin();
+if(user.VEHICLE_API) showVehicle();
 </script>
 </body>
 </html>
-
