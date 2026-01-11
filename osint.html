@@ -161,7 +161,7 @@ async function runNumber(){
   if(!v) return numResult.textContent="Enter number";
   numResult.textContent="Loading...";
 
-  fetch("https://source-code-api.vercel.app/?num="+v)
+  fetch("https://akash-number-info-api.vercel.app/api/number?num=+v)
     .then(r=>r.json())
     .then(d=>numResult.textContent=JSON.stringify(d,null,2))
     .catch(()=>numResult.textContent="Failed");
@@ -227,3 +227,4 @@ function copyText(id){
 </script>
 </body>
 </html>
+
