@@ -63,10 +63,10 @@ button:hover{background:darkorange;}
 <div class="box">
 <h3>🔥 Quick Buy (Instant UPI)</h3>
 
-<button onclick="quickBuy(48)">Buy 48 Coins</button>
-<button onclick="quickBuy(50)">Buy 50 Coins</button>
-<button onclick="quickBuy(102)">Buy 102 Coins</button>
-<button onclick="quickBuy(200)">Buy 200 Coins</button>
+<button onclick="quickBuy(5)">Buy 5 Credits</button>
+<button onclick="quickBuy(10)">Buy 10 Credits</button>
+<button onclick="quickBuy(25)">Buy 25 Credits</button>
+<button onclick="quickBuy(50)">Buy 50 Credits</button>
 </div>
 
 <hr>
@@ -78,7 +78,7 @@ button:hover{background:darkorange;}
 <input id="usernameInput" placeholder="Exact username">
 
 <label>Credits you want</label>
-<input id="creditsInput" type="number" placeholder="Even number">
+<input id="creditsInput" type="number" placeholder="Multiple of 5">
 
 <button onclick="calculate()">Calculate Payment</button>
 </div>
@@ -108,12 +108,17 @@ try{
   }
 }catch(e){}
 
-/* ===== QUICK BUY (SILENT CALC + REDIRECT) ===== */
-function quickBuy(coins){
-  if(!coins || coins <= 0) return;
+/* ===== PRICE RULE =====
+   5 Credits = ₹1000
+   1 Credit = ₹200
+*/
 
-  const amount = (coins / 2) * 5; // silent calculation
-  const note = encodeURIComponent(`OSINT Credits ${coins}`);
+/* ===== QUICK BUY ===== */
+function quickBuy(credits){
+  if(!credits || credits <= 0) return;
+
+  const amount = credits * 200;
+  const note = encodeURIComponent(`Credits ${credits}`);
 
   const upiURL =
 `upi://pay?pa=${UPI_ID}&pn=OSINT&am=${amount}&cu=INR&tn=${note}`;
@@ -130,12 +135,12 @@ function calculate(){
     alert("Enter exact username");
     return;
   }
-  if(!credits || credits <= 0 || credits % 2 !== 0){
-    alert("Enter a valid even credit amount");
+  if(!credits || credits <= 0 || credits % 5 !== 0){
+    alert("Credits must be multiple of 5");
     return;
   }
 
-  const amount = (credits / 2) * 5;
+  const amount = credits * 200;
 
   paymentBox.style.display = "block";
   paymentBox.innerHTML = `
@@ -149,7 +154,7 @@ function calculate(){
 /* ===== SEND PROOF ===== */
 async function sendProof(){
   const username = usernameInput.value.trim();
-  const credits = creditsInput.value;
+  const credits = Number(creditsInput.value);
   const file = proof.files[0];
 
   if(!username || !credits){
@@ -161,7 +166,7 @@ async function sendProof(){
     return;
   }
 
-  const amount = (credits / 2) * 5;
+  const amount = credits * 200;
 
   const form = new FormData();
   form.append("file", file);
